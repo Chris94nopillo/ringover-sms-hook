@@ -4,65 +4,58 @@ import requests
 
 app = Flask(__name__)
 
-# Lecture des variables d'environnement
+# Clés d’environnement
 RINGOVER_API_KEY = os.getenv("RINGOVER_API_KEY")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
 @app.route("/send_confirmation_sms", methods=["POST"])
-def send_confirmation_sms():
+def send_sms():
     try:
-        print("✅ Requête reçue sur /send_confirmation_sms")
+        print("✅ Requête reçue")
+        data = request.get_json(force=True)
+        print("📥 Données reçues :", data)
 
-        data = request.get_json()
-        print("📥 Données JSON reçues :", data)
-
-        # Sécurité : mot de passe
-        password = data.get("password") or data.get("secret")
-        if password != WEBHOOK_SECRET:
-            print("❌ Mot de passe incorrect :", password)
-            return jsonify({"error": "Unauthorized"}), 401
-
-        # Extraction des champs
         phone = data.get("phone")
         firstname = data.get("firstname")
         meeting_time = data.get("meeting_time")
+        password = data.get("password")
         from_alphanum = data.get("from_alphanum", "Nopillo")
 
-        # Vérification des champs
-        if not all([phone, firstname, meeting_time]):
-            print("❌ Champs manquants :", {"phone": phone, "firstname": firstname, "meeting_time": meeting_time})
+        if password != WEBHOOK_SECRET:
+            print("❌ Mot de passe invalide")
+            return jsonify({"error": "Unauthorized"}), 401
+
+        if not phone or not firstname or not meeting_time:
+            print("❌ Champs manquants")
             return jsonify({"error": "Missing required fields"}), 400
 
-        # Message SMS
         message = f"Bonjour {firstname}, votre RDV est confirmé pour {meeting_time}. À très vite !"
+
         payload = {
             "number": phone,
             "text": message,
             "from": from_alphanum
         }
+
         headers = {
             "Authorization": RINGOVER_API_KEY,
             "Content-Type": "application/json"
         }
 
-        print("📤 Envoi du SMS à Ringover...")
-        print("➡️ Payload :", payload)
-        print("➡️ Headers :", headers)
-
         response = requests.post("https://public-api.ringover.com/v2/sms", json=payload, headers=headers)
-
-        print("📬 Réponse Ringover :", response.status_code, response.text)
+        print("📤 Requête Ringover envoyée :", payload)
+        print("📥 Réponse Ringover :", response.status_code, response.text)
 
         if response.status_code == 200:
-            return jsonify({"success": True, "details": response.json()}), 200
+            return jsonify({"success": True}), 200
         else:
-            return jsonify({"error": "Ringover API error", "details": response.text}), response.status_code
+            return jsonify({"error": "Ringover error", "details": response.text}), response.status_code
 
     except Exception as e:
-        print("🔥 Erreur inattendue :", str(e))
+        print("🔥 Erreur serveur :", str(e))
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
-# Lancement de l'app compatible Render
+# Port dynamique pour Render
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port)
