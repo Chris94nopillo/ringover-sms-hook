@@ -1,77 +1,69 @@
-import os
-import json
 from flask import Flask, request, jsonify
-from dotenv import load_dotenv
+import os
 import requests
-
-load_dotenv()
 
 app = Flask(__name__)
 
+# Lecture des variables d'environnement
 RINGOVER_API_KEY = os.getenv("RINGOVER_API_KEY")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
-
-@app.route('/')
-def home():
-    return 'Webhook Ringover is up!'
 
 @app.route('/send_confirmation_sms', methods=['POST'])
 def send_confirmation_sms():
     try:
-        print("📥 Réception d'une requête POST sur /send_confirmation_sms")
-
         data = request.get_json()
-        print("🧾 Payload brut reçu :", data)
 
-        # Vérification du mot de passe
-        password = data.get("password")
-        print(f"🔐 Mot de passe reçu : {password}")
+        # Debug - afficher les données reçues
+        print("✅ Données reçues :", data)
 
+        # Récupération des champs attendus
+        phone = data.get("phone")
+        firstname = data.get("firstname")
+        meeting_time = data.get("meeting_time")
+        password = data.get("password") or data.get("secret")
+        from_alphanum = data.get("from_alphanum", "Nopillo")
+
+        # Vérification du mot de passe transmis
         if password != WEBHOOK_SECRET:
-            print("⛔ Mot de passe incorrect.")
+            print("❌ Mot de passe incorrect")
             return jsonify({"error": "Unauthorized"}), 401
 
-        # Extraction des données
-        prenom = data.get("firstname", "")
-        date_heure = data.get("datetime", "")
-        numero = data.get("phone", "")
-
-        print(f"📤 Données extraites : prénom = {prenom}, date = {date_heure}, numéro = {numero}")
-
-        if not all([prenom, date_heure, numero]):
-            print("⚠️ Champs manquants.")
+        # Vérification des champs requis
+        if not phone or not firstname or not meeting_time:
+            print("❌ Champs manquants")
             return jsonify({"error": "Missing required fields"}), 400
 
-        # Message à envoyer
-        message = f"Bonjour {prenom}, votre RDV est bien confirmé pour le {date_heure}. À très vite, l’équipe Nopillo."
-        print(f"✉️ Message préparé : {message}")
+        # Construction du message
+        message = f"Bonjour {firstname}, votre RDV est confirmé pour {meeting_time}. À très vite !"
 
-        # Requête vers l’API Ringover
-        response = requests.post(
-            "https://public-api.ringover.com/v2/sms",
-            headers={
-                "Authorization": f"Bearer {RINGOVER_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "number": numero,
-                "text": message
-            }
-        )
+        # Construction du corps de la requête Ringover
+        payload = {
+            "number": phone,
+            "text": message,
+            "from": from_alphanum
+        }
 
-        print("📡 Requête envoyée à Ringover. Code retour :", response.status_code)
-        print("🧾 Réponse Ringover :", response.text)
+        headers = {
+            "Authorization": RINGOVER_API_KEY,  # ✅ pas de Bearer
+            "Content-Type": "application/json"
+        }
 
-        if response.status_code != 200:
-            print("❌ Échec de l'envoi du SMS.")
-            return jsonify({"error": "SMS sending failed", "details": response.text}), 500
+        # Envoi du SMS via l’API Ringover
+        response = requests.post("https://public-api.ringover.com/v2/sms", json=payload, headers=headers)
 
-        print("✅ SMS envoyé avec succès !")
-        return jsonify({"status": "success", "message": "SMS sent"}), 200
+        # Debug - afficher la réponse de Ringover
+        print("📤 Requête envoyée à Ringover :", payload)
+        print("📥 Réponse Ringover :", response.status_code, response.text)
+
+        if response.status_code == 200:
+            return jsonify({"success": True, "details": response.json()}), 200
+        else:
+            return jsonify({"error": "Ringover API error", "details": response.text}), response.status_code
 
     except Exception as e:
-        print("🔥 Erreur serveur :", str(e))
-        return jsonify({"error": str(e)}), 500
+        print("🔥 Erreur inattendue :", str(e))
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+# Lancer l’application
+if __name__ == "__main__":
+    app.run(debug=False, host="0.0.0.0", port=10000)
