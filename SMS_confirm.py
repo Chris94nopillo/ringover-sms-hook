@@ -64,7 +64,7 @@ def send_confirmation_sms():
         print("🔥 Erreur inattendue :", str(e))
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
-# Lancer l’application avec port dynamique (compatible Render)
+# Lancer l’application (Render doit utiliser le port défini dans la variable d'environnement)
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 5000))  # ✅ Render injecte le port via la variable PORT
     app.run(debug=False, host="0.0.0.0", port=port)
