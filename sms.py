@@ -1,12 +1,20 @@
 from flask import Flask, request, jsonify
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
 
 RINGOVER_API_KEY = os.getenv("RINGOVER_API_KEY")
 WEBHOOK_SECRET   = os.getenv("WEBHOOK_SECRET")
+
+# Table des mois en français
+FRENCH_MONTHS = {
+    1:  "janvier",   2:  "février", 3:  "mars",
+    4:  "avril",     5:  "mai",     6:  "juin",
+    7:  "juillet",   8:  "août",    9:  "septembre",
+    10: "octobre",   11: "novembre",12: "décembre"
+}
 
 @app.route('/', methods=['GET'])
 def index():
@@ -28,23 +36,26 @@ def send_confirmation_sms():
     meeting_time = data.get("meeting_time")
     sender       = data.get("from_alphanum", "Nopillo")
 
-    # Validation minimale
     if not phone or not firstname or not meeting_time:
         return jsonify({"error": "Missing required fields"}), 400
 
-    # ——————————————
-    # Conversion du timestamp si nécessaire
+    # Si meeting_time est un timestamp en ms, on convertit en Europe/Paris
     human_time = meeting_time
-    # Détecte une chaîne de chiffres (epoch en ms)
     if isinstance(meeting_time, (int, float)) or (isinstance(meeting_time, str) and meeting_time.isdigit()):
         ms = int(meeting_time)
-        # convertit en seconde
-        dt = datetime.fromtimestamp(ms / 1000)
-        human_time = dt.strftime("%d %B %Y à %Hh%M")  # ex: "15 juillet 2025 à 09h45"
-    # ——————————————
+        # UTC -> datetime
+        dt_utc = datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
+        # Conversion en Europe/Paris (UTC+2 en été)
+        dt_local = dt_utc.astimezone(tz=timezone(timedelta(hours=2)))
+        day   = dt_local.day
+        month = FRENCH_MONTHS[dt_local.month]
+        year  = dt_local.year
+        hour  = dt_local.hour
+        minute= dt_local.minute
+        human_time = f"{day} {month} {year} à {hour}h{minute:02d}"
 
     # Construction du message
-    message = f"Bonjour {firstname}, votre rendez-vous avec Nopillo est confirmé pour {human_time}. À bientôt !"
+    message = f"Bonjour {firstname}, votre RDV est confirmé pour {human_time}. À bientôt !"
 
     payload = {
         "from_alphanum": sender,
@@ -56,7 +67,7 @@ def send_confirmation_sms():
         "Content-Type":  "application/json"
     }
 
-    # Appel à l’API Ringover (URL v1)
+    # Envoi vers Ringover
     resp = requests.post(
         "https://public-api.ringover.com/v2/push/sms/v1",
         json=payload, headers=headers
