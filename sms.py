@@ -44,7 +44,7 @@ def send_confirmation_sms():
     # ——————————————
 
     # Construction du message
-    message = f"Bonjour {firstname}, votre RDV est confirmé pour {human_time}. À bientôt !"
+    message = f"Bonjour {firstname}, votre rendez-vous avec Nopillo est confirmé pour {human_time}. À bientôt !"
 
     payload = {
         "from_alphanum": sender,
