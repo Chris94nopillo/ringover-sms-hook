@@ -13,51 +13,45 @@ def index():
 
 @app.route('/sms', methods=['POST'])
 def send_confirmation_sms():
-    try:
-        data = request.get_json()
-        print("✅ Données reçues :", data)
+    data = request.get_json()
+    print("✅ Données reçues :", data)
 
-        phone = data.get("phone")
-        firstname = data.get("firstname")
-        meeting_time = data.get("meeting_time")
-        password = data.get("password") or data.get("secret")
-        from_alphanum = data.get("from_alphanum", "Nopillo")
+    # Vérification du secret
+    pwd = data.get("password") or data.get("secret")
+    if pwd != WEBHOOK_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
 
-        if password != WEBHOOK_SECRET:
-            print("❌ Mot de passe incorrect")
-            return jsonify({"error": "Unauthorized"}), 401
+    # Chiffres obligatoires
+    phone = data.get("phone")
+    firstname = data.get("firstname")
+    meeting_time = data.get("meeting_time")
+    if not phone or not firstname or not meeting_time:
+        return jsonify({"error": "Missing required fields"}), 400
 
-        if not phone or not firstname or not meeting_time:
-            print("❌ Champs manquants")
-            return jsonify({"error": "Missing required fields"}), 400
+    # Préparation du SMS pour Ringover
+    message = f"Bonjour {firstname}, votre RDV est confirmé pour {meeting_time}."
+    payload = {
+        "from_alphanum": data.get("from_alphanum", "Nopillo"),
+        "to_number": int(phone),
+        "content": message
+    }
+    headers = {
+        "Authorization": RINGOVER_API_KEY,
+        "Content-Type": "application/json"
+    }
 
-        message = f"Bonjour {firstname}, votre RDV est confirmé pour {meeting_time}. À très vite !"
+    # Envoi vers Ringover — URL corrigée
+    resp = requests.post(
+        "https://public-api.ringover.com/v2/push/sms/v1",
+        json=payload, headers=headers
+    )
+    print("📥 Ringover response:", resp.status_code, resp.text)
 
-        payload = {
-            "number": phone,
-            "text": message,
-            "from": from_alphanum
-        }
-
-        headers = {
-            "Authorization": RINGOVER_API_KEY,
-            "Content-Type": "application/json"
-        }
-
-        response = requests.post("https://public-api.ringover.com/v2/sms/v1", json=payload, headers=headers)
-
-        print("📤 Requête envoyée à Ringover :", payload)
-        print("📥 Réponse Ringover :", response.status_code, response.text)
-
-        if response.status_code == 200:
-            return jsonify({"success": True, "details": response.json()}), 200
-        else:
-            return jsonify({"error": "Ringover API error", "details": response.text}), response.status_code
-
-    except Exception as e:
-        print("🔥 Erreur inattendue :", str(e))
-        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+    if resp.ok:
+        return jsonify({"success": True}), 200
+    else:
+        return jsonify({"error": "Ringover API error", "details": resp.text}), resp.status_code
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port)
