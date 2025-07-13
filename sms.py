@@ -55,7 +55,7 @@ def send_confirmation_sms():
         human_time = f"{day} {month} {year} à {hour}h{minute:02d}"
 
     # Construction du message
-    message = f"Bonjour {firstname}, votre RDV est confirmé pour {human_time}. À bientôt !"
+    message = f"Bonjour {firstname}, votre rendez-vous avec Nopillo est confirmé pour {human_time}. À bientôt !"
 
     payload = {
         "from_alphanum": sender,
