@@ -44,7 +44,7 @@ def send_confirmation_sms():
             "Content-Type": "application/json"
         }
 
-        response = requests.post("https://public-api.ringover.com/v2/sms", json=payload, headers=headers)
+        response = requests.post("https://public-api.ringover.com/v2/sms/v1", json=payload, headers=headers)
 
         print("📤 Requête envoyée à Ringover :", payload)
         print("📥 Réponse Ringover :", response.status_code, response.text)
