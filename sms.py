@@ -4,26 +4,25 @@ import requests
 
 app = Flask(__name__)
 
-# Récupération des clés depuis les variables d'environnement
+# Lecture des variables d'environnement
 RINGOVER_API_KEY = os.getenv("RINGOVER_API_KEY")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
-@app.route('/send_confirmation_sms', methods=['POST'])
+@app.route('/sms', methods=['POST'])  # 🔁 Chemin modifié ici
 def send_confirmation_sms():
     try:
         data = request.get_json()
 
-        # Log des données reçues
+        # Debug - afficher les données reçues
         print("✅ Données reçues :", data)
 
-        # Extraction des champs
         phone = data.get("phone")
         firstname = data.get("firstname")
         meeting_time = data.get("meeting_time")
         password = data.get("password") or data.get("secret")
         from_alphanum = data.get("from_alphanum", "Nopillo")
 
-        # Vérification du mot de passe
+        # Vérification du mot de passe transmis
         if password != WEBHOOK_SECRET:
             print("❌ Mot de passe incorrect")
             return jsonify({"error": "Unauthorized"}), 401
@@ -33,7 +32,6 @@ def send_confirmation_sms():
             print("❌ Champs manquants")
             return jsonify({"error": "Missing required fields"}), 400
 
-        # Message personnalisé
         message = f"Bonjour {firstname}, votre RDV est confirmé pour {meeting_time}. À très vite !"
 
         payload = {
@@ -61,7 +59,7 @@ def send_confirmation_sms():
         print("🔥 Erreur inattendue :", str(e))
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
-# Port dynamique pour Render
+# Lancer l’application (Render)
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))  # ✅ Port 10000 comme avant
+    port = int(os.environ.get("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port)
