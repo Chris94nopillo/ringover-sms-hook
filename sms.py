@@ -42,7 +42,7 @@ def send_confirmation_sms():
         firstname = firstname.strip().capitalize()
 
         # Message personnalisé
-        message = f"Bonjour {firstname}, votre RDV est confirmé pour {meeting_time}. À très vite !"
+        message = f"Bonjour {firstname}, votre RDV avec Nopillo est confirmé pour {meeting_time}. À très vite !"
 
         payload = {
             "to_number": phone,
