@@ -1,83 +1,67 @@
 from flask import Flask, request, jsonify
 import os
-import re
 import requests
 
 app = Flask(__name__)
 
-# Récupération des clés depuis les variables d'environnement
 RINGOVER_API_KEY = os.getenv("RINGOVER_API_KEY")
-WEBHOOK_SECRET   = os.getenv("WEBHOOK_SECRET")
+WEBHOOK_SECRET    = os.getenv("WEBHOOK_SECRET")
 
 @app.route("/sms", methods=["POST"])
 def send_confirmation_sms():
     data = request.get_json(force=True)
     print("✅ Données reçues :", data)
 
-    # Extraction des champs
-    raw_phone    = data.get("phone", "")
-    firstname    = data.get("firstname", "")
-    meeting_time = data.get("meeting_time", "")
-    secret       = data.get("password") or data.get("secret")
-    from_alias   = data.get("from_alphanum", "Nopillo")
+    # —> Toujours caster en str avant strip/replace
+    raw_phone     = str(data.get("phone", "")).strip()
+    firstname_raw = data.get("firstname", "")
+    meeting_time  = data.get("meeting_time", "")
+    password      = data.get("password") or data.get("secret")
+    from_alphanum = data.get("from_alphanum", "Nopillo")
 
-    # Vérification du secret
-    if secret != WEBHOOK_SECRET:
-        print("❌ Mot de passe incorrect")
+    if password != WEBHOOK_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
 
-    # Vérification des champs obligatoires
-    if not raw_phone or not firstname or not meeting_time:
-        print("❌ Champs manquants")
+    if not raw_phone or not firstname_raw or not meeting_time:
         return jsonify({"error": "Missing required fields"}), 400
 
-    # — Normalisation du numéro —
-    # on retire tout sauf chiffres et +
-    phone = re.sub(r"[^\d\+]", "", raw_phone)
-    # on enlève le '+'
-    if phone.startswith("+"):
-        phone = phone[1:]
-    # on transforme un '0XXXXXXXXX' en '33XXXXXXXXX'
+    # Normalisation du numéro
+    phone = raw_phone.replace(" ", "").replace("-", "")
+    if phone.startswith("+33"):
+        phone = "0" + phone[3:]
     if phone.startswith("0"):
         phone = "33" + phone[1:]
 
-    # — Mise en forme du prénom —
-    firstname = firstname.strip().capitalize()
+    # Capitalisation du prénom
+    firstname = firstname_raw.strip().capitalize()
 
     # Construction du message
-    message = (
-        f"Bonjour {firstname}, votre RDV avec Nopillo "
-        f"est confirmé pour {meeting_time}. À très vite !"
-    )
+    message = f"Bonjour {firstname}, votre RDV avec Npolli est confirmé pour {meeting_time}. Merci et à bientôt !"
 
-    # Préparation de la requête vers Ringover
     payload = {
-        "to_number": phone,
-        "text":      message,
-        "from_alias": from_alias
+        "from_alphanum": from_alphanum,
+        "to_number"    : phone,
+        "content"      : message
     }
     headers = {
         "Authorization": RINGOVER_API_KEY,
-        "Content-Type":  "application/json"
+        "Content-Type" : "application/json"
     }
 
-    # Envoi
     resp = requests.post(
         "https://public-api.ringover.com/v2/push/sms/v1",
-        json=payload, headers=headers
+        json=payload,
+        headers=headers
     )
-    print("📤 Payload Ringover:", payload)
-    print("📥 Réponse Ringover:", resp.status_code, resp.text)
 
-    if resp.status_code != 200:
-        return jsonify({
-            "error":   "Ringover API error",
-            "details": resp.text
-        }), resp.status_code
+    print("📤 Envoi payload :", payload)
+    print("📥 Réponse Ringover :", resp.status_code, resp.text)
 
-    # Tout est OK
-    return jsonify({"success": True}), 200
+    if resp.status_code == 200:
+        return jsonify({"success": True}), 200
+    else:
+        return jsonify({"error": "Ringover API error", "details": resp.text}), resp.status_code
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=False)
