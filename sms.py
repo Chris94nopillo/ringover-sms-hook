@@ -86,12 +86,12 @@ def send_confirmation_sms():
     # Construction du message
     if reminder:
         message = (
-            f"Bonjour {firstname}, petit rappel de votre RDV Nopillo prévu aujourd'hui à "
+            f"Bonjour {firstname}, petit rappel de votre RDV avec Nopillo prévu aujourd'hui "
             f"{meeting_time}. À tout à l’heure !"
         )
     else:
         message = (
-            f"Bonjour {firstname}, votre RDV avec Nopillo est confirmé pour "
+            f"Bonjour {firstname}, votre RDV avec Nopillo est confirmé pour le "
             f"{meeting_time}. À très vite !"
         )
 
